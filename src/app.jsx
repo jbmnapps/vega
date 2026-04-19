@@ -47,7 +47,7 @@ function App() {
   const onCloseModal = () => setModal(null);
 
   const renderScreen = () => {
-    if (tab === 'idag') return <IdagScreen app={app} onOpenLogger={onOpenLogger} onOpenProfile={() => setModal('profile')} onAddPost={() => {}} />;
+    if (tab === 'idag') return <IdagScreen app={app} onOpenLogger={onOpenLogger} onOpenProfile={() => setModal('profile')} onAddPost={() => setModal('add-post')} />;
     if (tab === 'foder') return <FoderScreen app={app} onOpenLogger={onOpenLogger} />;
     if (tab === 'vaegt') return <VaegtScreen app={app} onOpenLogger={onOpenLogger}
       onOpenDetail={() => setModal('vaegt-detail')}
@@ -71,6 +71,7 @@ function App() {
     else if (modal === 'vaegt-malinger') content = <MalingerScreen app={app} {...common} />;
     else if (modal === 'obs-new') content = <ObsNewScreen app={app} {...common} />;
     else if (modal === 'profile') content = <ProfileScreen app={app} {...common} />;
+    else if (modal === 'add-post') content = <AddPostScreen app={app} {...common} />;
 
     return (
       <div style={{
@@ -190,12 +191,18 @@ function ProfileScreen({ app, onBack }) {
             <Divider inset={18} />
             <ProfileRow
               label="Dagligt mål"
-              value={`${app.kcalTarget} kcal`}
+              value={app.kcalTarget == null ? 'Ikke sat' : `${app.kcalTarget} kcal`}
               editing={editing}
               inputType="number"
-              rawValue={String(app.kcalTarget)}
+              rawValue={app.kcalTarget == null ? '' : String(app.kcalTarget)}
+              placeholder="Ikke sat"
               suffix="kcal"
-              onChange={(v) => app.setKcalTarget(parseInt(v, 10) || 0)}
+              onChange={(v) => {
+                const trimmed = (v || '').trim();
+                if (trimmed === '') { app.setKcalTarget(null); return; }
+                const n = parseInt(trimmed, 10);
+                app.setKcalTarget(Number.isFinite(n) && n > 0 ? n : null);
+              }}
             />
             <Divider inset={18} />
             <ProfileRow
@@ -219,7 +226,7 @@ function ProfileScreen({ app, onBack }) {
   );
 }
 
-function ProfileRow({ label, value, chevron, editing, onChange, inputType, rawValue, suffix }) {
+function ProfileRow({ label, value, chevron, editing, onChange, inputType, rawValue, suffix, placeholder }) {
   const editable = editing && typeof onChange === 'function';
 
   return (
@@ -232,6 +239,7 @@ function ProfileRow({ label, value, chevron, editing, onChange, inputType, rawVa
           <input
             type={inputType || 'text'}
             value={rawValue ?? value}
+            placeholder={placeholder || ''}
             onChange={(e) => onChange(e.target.value)}
             style={{
               ...baseText, fontSize: 15, color: TOKENS.ink,

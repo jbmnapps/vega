@@ -166,7 +166,50 @@ function PlanCheck({ checked, onClick }) {
   );
 }
 
+// Day swiper — < date > control used on screens that scroll through days
+function DaySwiper({ date, onChange }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const isToday = date === today;
+  const isFuture = new Date(date) > new Date(today);
+  const shift = (days) => {
+    const d = new Date(date); d.setDate(d.getDate() + days);
+    onChange(d.toISOString().slice(0, 10));
+  };
+  const wds = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
+  const weekday = wds[new Date(date).getDay()];
+  const arrowBtn = {
+    width: 36, height: 36, borderRadius: 18,
+    background: 'transparent', border: 'none', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
+  return (
+    <div style={{
+      padding: '8px 20px 24px',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
+    }}>
+      <button onClick={() => shift(-1)} style={arrowBtn}>
+        <svg width="14" height="14" viewBox="0 0 14 14"><path d="M9 2L4 7l5 5" fill="none" stroke={TOKENS.ink} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </button>
+      <div style={{ textAlign: 'center', minWidth: 160 }}>
+        <div style={{
+          ...baseText, fontSize: 18, fontWeight: 500, color: TOKENS.ink,
+          letterSpacing: '-0.02em',
+        }}>{isToday ? 'I dag' : window.formatDanishDate(date)}</div>
+        {!isToday && (
+          <div style={{
+            ...baseText, fontSize: 11, color: TOKENS.inkMuted,
+            marginTop: 2, letterSpacing: '0.04em',
+          }}>{weekday}</div>
+        )}
+      </div>
+      <button onClick={() => !isFuture && shift(1)} disabled={isFuture} style={{ ...arrowBtn, opacity: isFuture ? 0.3 : 1 }}>
+        <svg width="14" height="14" viewBox="0 0 14 14"><path d="M5 2l5 5-5 5" fill="none" stroke={TOKENS.ink} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </button>
+    </div>
+  );
+}
+
 Object.assign(window, {
   VegaAvatar, PrimaryButton, GhostButton, TextInput,
-  Card, Divider, Pill, SectionLabel, PlanCheck, baseText,
+  Card, Divider, Pill, SectionLabel, PlanCheck, DaySwiper, baseText,
 });

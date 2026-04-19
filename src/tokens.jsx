@@ -24,6 +24,9 @@ const TOKENS = {
 
   // Sage (observation / neutral-cool)
   sage: '#9ba694',
+
+  // Destructive — warm terracotta, sits in same earth family as amber/rose
+  danger: '#a8594a',
 };
 
 window.TOKENS = TOKENS;

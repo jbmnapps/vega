@@ -3,8 +3,13 @@
 // Plan card and quick-log sit on clean cream below — Nordic calm preserved.
 
 function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost }) {
-  const planTotal = app.plan.length;
-  const planDoneCount = app.plan.filter(p => app.planDone[p.id]).length;
+  const sortedPlan = React.useMemo(
+    () => [...app.plan].sort((a, b) => a.time.localeCompare(b.time)),
+    [app.plan]
+  );
+  const planTotal = sortedPlan.length;
+  const planDoneCount = sortedPlan.filter(p => app.planDone[p.id]).length;
+  const [swipeOpenId, setSwipeOpenId] = React.useState(null);
 
   const today = new Date();
   const months = ['januar','februar','marts','april','maj','juni','juli','august','september','oktober','november','december'];
@@ -64,37 +69,50 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost }) {
               overflowY: 'auto', overflowX: 'hidden',
               WebkitOverflowScrolling: 'touch',
             }}>
-              {app.plan.map((item, i) => {
+              {sortedPlan.map((item) => {
                 const done = app.planDone[item.id];
                 return (
                   <div key={item.id}>
-                    <div
-                      onClick={() => {
-                        if (item.kind === 'food' && !done) onOpenLogger('foder-log');
-                        else app.togglePlan(item.id);
-                      }}
-                      style={{
-                        display: 'flex', alignItems: 'center',
-                        padding: '15px 18px', gap: 14, cursor: 'pointer',
-                      }}
+                    <SwipeRow
+                      open={swipeOpenId === item.id}
+                      onOpenChange={(o) => setSwipeOpenId(o ? item.id : null)}
+                      onDelete={() => { app.removePlanPost(item.id); setSwipeOpenId(null); }}
                     >
-                      <PlanCheck checked={done} onClick={(e) => { e.stopPropagation(); app.togglePlan(item.id); }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        onClick={() => {
+                          if (swipeOpenId === item.id) { setSwipeOpenId(null); return; }
+                          if (item.kind === 'food' && !done) onOpenLogger('foder-log');
+                          else app.togglePlan(item.id);
+                        }}
+                        style={{
+                          display: 'flex', alignItems: 'center',
+                          padding: '11px 18px', gap: 14, cursor: 'pointer',
+                          background: TOKENS.surface,
+                        }}
+                      >
+                        <PlanCheck checked={done} onClick={(e) => { e.stopPropagation(); app.togglePlan(item.id); }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            ...baseText, fontSize: 16, fontWeight: 450,
+                            color: done ? TOKENS.inkMuted : TOKENS.ink,
+                            letterSpacing: '-0.01em',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>{item.label}</div>
+                          {planDetail(item, app.products) && (
+                            <div style={{
+                              ...baseText, fontSize: 12, marginTop: 3,
+                              color: TOKENS.inkMuted, letterSpacing: '-0.005em',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}>{planDetail(item, app.products)}</div>
+                          )}
+                        </div>
                         <div style={{
-                          ...baseText, fontSize: 16, fontWeight: 450,
-                          color: done ? TOKENS.inkMuted : TOKENS.ink,
-                          textDecoration: done ? 'line-through' : 'none',
-                          textDecorationColor: TOKENS.inkFaint,
-                          letterSpacing: '-0.01em',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>{item.label}</div>
+                          ...baseText, fontSize: 14,
+                          color: TOKENS.inkMuted, fontVariantNumeric: 'tabular-nums',
+                          letterSpacing: '-0.005em',
+                        }}>kl. {item.time}</div>
                       </div>
-                      <div style={{
-                        ...baseText, fontSize: 14,
-                        color: TOKENS.inkMuted, fontVariantNumeric: 'tabular-nums',
-                        letterSpacing: '-0.005em',
-                      }}>kl. {item.time}</div>
-                    </div>
+                    </SwipeRow>
                     <Divider inset={52} />
                   </div>
                 );
@@ -103,7 +121,7 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost }) {
                 onClick={onAddPost}
                 style={{
                   display: 'flex', alignItems: 'center',
-                  padding: '15px 18px', gap: 14, cursor: 'pointer',
+                  padding: '11px 18px', gap: 14, cursor: 'pointer',
                 }}
               >
                 <AddGlyph />
@@ -239,6 +257,84 @@ function QuickActionD({ label, onClick }) {
         letterSpacing: '-0.01em',
       }}>{label}</span>
     </button>
+  );
+}
+
+// Detaljelinje under label — kcal (mad), min (aktivitet), dose+unit (medicin).
+// Returnerer tom streng hvis detaljer mangler.
+function planDetail(item, products) {
+  const d = item.details;
+  if (!d) return '';
+  if (item.category === 'mad') {
+    const p = products.find(x => x.id === d.productId);
+    if (p && p.kcal100 != null && d.grams) {
+      return `${Math.round((p.kcal100 / 100) * d.grams)} kcal`;
+    }
+    if (d.grams) return `${d.grams} g`;
+    return '';
+  }
+  if (item.category === 'aktivitet' && d.minutes) return `${d.minutes} min`;
+  if (item.category === 'medicin' && d.dose != null) {
+    return `${d.dose} ${d.unit || ''}`.trim();
+  }
+  return '';
+}
+
+// Swipe-til-venstre afslører en "Slet"-knap bagved.
+// Tærskel: > 40px → snap åben (-80), ellers snap tilbage.
+function SwipeRow({ children, onDelete, open, onOpenChange }) {
+  const [startX, setStartX] = React.useState(null);
+  const [dx, setDx] = React.useState(0);
+  const moved = React.useRef(false);
+
+  const baseOffset = open ? -80 : 0;
+  const live = startX !== null ? baseOffset + dx : baseOffset;
+  const clamped = Math.max(-100, Math.min(0, live));
+
+  const onDown = (e) => {
+    setStartX(e.clientX);
+    setDx(0);
+    moved.current = false;
+  };
+  const onMove = (e) => {
+    if (startX === null) return;
+    const d = e.clientX - startX;
+    if (Math.abs(d) > 4) moved.current = true;
+    setDx(d);
+  };
+  const onUp = () => {
+    if (startX === null) return;
+    const final = baseOffset + dx;
+    onOpenChange(final < -40);
+    setStartX(null);
+    setDx(0);
+  };
+
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden', background: TOKENS.danger }}>
+      <button
+        onClick={onDelete}
+        style={{
+          position: 'absolute', top: 0, right: 0, bottom: 0, width: 80,
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          color: '#fff', fontSize: 14, fontWeight: 500,
+          letterSpacing: '-0.005em', fontFamily: 'inherit',
+        }}
+      >Slet</button>
+      <div
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        onClickCapture={(e) => { if (moved.current) { e.stopPropagation(); e.preventDefault(); moved.current = false; } }}
+        style={{
+          position: 'relative',
+          transform: `translateX(${clamped}px)`,
+          transition: startX !== null ? 'none' : 'transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+          touchAction: 'pan-y',
+        }}
+      >{children}</div>
+    </div>
   );
 }
 

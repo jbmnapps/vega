@@ -10,7 +10,7 @@ function useAppState() {
   const [birthdate, setBirthdate] = React.useState('2025-02-12'); // YYYY-MM-DD
   const [breed, setBreed] = React.useState('Blandet');
   const [vet, setVet] = React.useState('Vesterbro Dyreklinik');
-  const [kcalTarget, setKcalTarget] = React.useState(220);
+  const [kcalTarget, setKcalTarget] = React.useState(null);
 
   // Weight log — seeded history in kg
   const [weights, setWeights] = React.useState([
@@ -32,10 +32,11 @@ function useAppState() {
     { id: 'p4', name: 'Kattesnack, laks', type: 'Snack', kcal100: 340 },
   ]);
 
-  // Food log for today
+  // Food log — dated entries
+  const _today = new Date().toISOString().slice(0, 10);
   const [foodLog, setFoodLog] = React.useState([
-    { id: 'f1', productId: 'p1', grams: 18, time: '08:05' },
-    { id: 'f2', productId: 'p2', grams: 45, time: '12:30' },
+    { id: 'f1', productId: 'p1', grams: 18, time: '08:05', date: _today },
+    { id: 'f2', productId: 'p2', grams: 45, time: '12:30', date: _today },
   ]);
 
   // Plan — items user built themselves.
@@ -78,13 +79,30 @@ function useAppState() {
   const addFoodLog = (productId, grams) => {
     const now = new Date();
     const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    setFoodLog(l => [...l, { id: 'f' + Date.now(), productId, grams: parseFloat(grams), time }]);
+    const date = now.toISOString().slice(0, 10);
+    setFoodLog(l => [...l, { id: 'f' + Date.now(), productId, grams: parseFloat(grams), time, date }]);
   };
 
   const addProduct = (p) => {
     const id = 'p' + Date.now();
     setProducts(ps => [...ps, { ...p, id }]);
     return id;
+  };
+
+  const addPlanPost = ({ label, time, category, details, done }) => {
+    const id = 'pl' + Date.now();
+    setPlanBase(p => [...p, {
+      id, label, time,
+      kind: category || 'custom',
+      category: category || null,
+      details: details || null,
+    }]);
+    setPlanDone(d => ({ ...d, [id]: !!done }));
+  };
+
+  const removePlanPost = (id) => {
+    setPlanBase(p => p.filter(x => x.id !== id));
+    setPlanDone(d => { const n = { ...d }; delete n[id]; return n; });
   };
 
   const togglePlan = (id) => setPlanDone(d => ({ ...d, [id]: !d[id] }));
@@ -115,7 +133,7 @@ function useAppState() {
     weights, addWeight,
     products, addProduct,
     foodLog, addFoodLog,
-    plan: planBase, planDone, togglePlan, completePlanFromFood,
+    plan: planBase, planDone, togglePlan, completePlanFromFood, addPlanPost, removePlanPost,
     observations, vocab, addObservation,
   };
 }
@@ -157,8 +175,13 @@ function productName(products, id) {
   return products.find(p => p.id === id)?.name || '';
 }
 
+function kcalForDate(products, foodLog, date) {
+  return foodLog.filter(l => l.date === date).reduce((s, l) => s + kcalForLog(products, l), 0);
+}
+
 function todayKcal(products, foodLog) {
-  return foodLog.reduce((s, l) => s + kcalForLog(products, l), 0);
+  const today = new Date().toISOString().slice(0, 10);
+  return kcalForDate(products, foodLog, today);
 }
 
 // Format delta weight
@@ -177,6 +200,7 @@ window.useAppState = useAppState;
 window.kcalForLog = kcalForLog;
 window.productName = productName;
 window.todayKcal = todayKcal;
+window.kcalForDate = kcalForDate;
 window.fmtDelta = fmtDelta;
 window.fmtKg = fmtKg;
 window.ageFromBirthdate = ageFromBirthdate;

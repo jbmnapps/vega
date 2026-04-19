@@ -5,6 +5,7 @@ function FoderLogScreen({ app, onBack, onComplete }) {
   const [selectedId, setSelectedId] = React.useState(app.products[0]?.id);
   const [grams, setGrams] = React.useState('');
   const [step, setStep] = React.useState('pick'); // pick | grams
+  const [showNewProduct, setShowNewProduct] = React.useState(false);
 
   const selected = app.products.find(p => p.id === selectedId);
   const gramsNum = parseFloat((grams || '').replace(',', '.')) || 0;
@@ -28,8 +29,32 @@ function FoderLogScreen({ app, onBack, onComplete }) {
             <SectionLabel>Vælg produkt</SectionLabel>
           </div>
           <Card padding={0}>
+            <div
+              onClick={() => setShowNewProduct(true)}
+              style={{
+                padding: '14px 18px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 12,
+              }}
+            >
+              <div style={{
+                width: 20, height: 20, borderRadius: 10,
+                border: `1px dashed ${TOKENS.lineStrong}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <svg width="9" height="9" viewBox="0 0 9 9">
+                  <path d="M4.5 1v7M1 4.5h7" fill="none" stroke={TOKENS.inkMuted}
+                    strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div style={{
+                ...baseText, flex: 1, fontSize: 15, fontWeight: 450,
+                color: TOKENS.inkMuted, letterSpacing: '-0.01em',
+              }}>Opret nyt produkt</div>
+            </div>
+            <Divider inset={18} />
             {app.products.map((p, i) => (
-              <div key={p.id}>
+              <React.Fragment key={p.id}>
                 <div
                   onClick={() => { setSelectedId(p.id); setStep('grams'); }}
                   style={{
@@ -53,7 +78,7 @@ function FoderLogScreen({ app, onBack, onComplete }) {
                   </svg>
                 </div>
                 {i < app.products.length - 1 && <Divider inset={18} />}
-              </div>
+              </React.Fragment>
             ))}
           </Card>
         </div>
@@ -117,6 +142,20 @@ function FoderLogScreen({ app, onBack, onComplete }) {
           </PrimaryButton>
         </div>
       )}
+
+      {showNewProduct && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 10,
+          background: TOKENS.bg,
+          animation: 'slideInRight 280ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        }}>
+          <NewProductScreen
+            app={app}
+            onBack={() => setShowNewProduct(false)}
+            onComplete={(id) => { setSelectedId(id); setShowNewProduct(false); setStep('grams'); }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -130,12 +169,12 @@ function NewProductScreen({ app, onBack, onComplete }) {
   const submit = () => {
     if (!valid) return;
     const kcalNum = parseFloat((kcal || '').replace(',', '.'));
-    app.addProduct({
+    const id = app.addProduct({
       name: name.trim(),
       type,
       kcal100: kcalNum > 0 ? kcalNum : null,
     });
-    onComplete();
+    onComplete(id);
   };
 
   return (

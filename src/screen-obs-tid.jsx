@@ -49,11 +49,6 @@ function ObsCanvas({ app }) {
   const [date, setDate] = React.useState(today);
   const [text, setText] = React.useState('');
 
-  const shiftDate = (days) => {
-    const d = new Date(date); d.setDate(d.getDate() + days);
-    setDate(d.toISOString().slice(0, 10));
-  };
-
   const dayObs = app.observations.filter(o => o.date === date).sort((a, b) => a.time.localeCompare(b.time));
 
   const submit = () => {
@@ -65,34 +60,10 @@ function ObsCanvas({ app }) {
   };
 
   const isToday = date === today;
-  const isFuture = new Date(date) > new Date(today);
 
   return (
     <div style={{ flex: 1, overflow: 'auto', padding: '0 0 40px' }}>
-      {/* Date swiper */}
-      <div style={{
-        padding: '8px 20px 24px',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
-      }}>
-        <button onClick={() => shiftDate(-1)} style={arrowBtn}>
-          <svg width="14" height="14" viewBox="0 0 14 14"><path d="M9 2L4 7l5 5" fill="none" stroke={TOKENS.ink} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>
-        <div style={{ textAlign: 'center', minWidth: 160 }}>
-          <div style={{
-            ...baseText, fontSize: 18, fontWeight: 500, color: TOKENS.ink,
-            letterSpacing: '-0.02em',
-          }}>{isToday ? 'I dag' : formatDanishDate(date)}</div>
-          {!isToday && (
-            <div style={{
-              ...baseText, fontSize: 11, color: TOKENS.inkMuted,
-              marginTop: 2, letterSpacing: '0.04em',
-            }}>{weekdayDanish(date)}</div>
-          )}
-        </div>
-        <button onClick={() => !isFuture && shiftDate(1)} disabled={isFuture} style={{ ...arrowBtn, opacity: isFuture ? 0.3 : 1 }}>
-          <svg width="14" height="14" viewBox="0 0 14 14"><path d="M5 2l5 5-5 5" fill="none" stroke={TOKENS.ink} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>
-      </div>
+      <DaySwiper date={date} onChange={setDate} />
 
       {/* Blank canvas — input box */}
       <div style={{ padding: '0 20px 20px' }}>
@@ -165,18 +136,6 @@ function ObsCanvas({ app }) {
       )}
     </div>
   );
-}
-
-const arrowBtn = {
-  width: 36, height: 36, borderRadius: 18,
-  background: 'transparent', border: 'none', cursor: 'pointer',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-};
-
-function weekdayDanish(iso) {
-  const d = new Date(iso);
-  const wds = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
-  return wds[d.getDay()];
 }
 
 // List view — chronological stream grouped by date, as before.
@@ -290,7 +249,7 @@ function TidslinjeScreen({ app }) {
     const hasKcal = p && p.kcal100 != null;
     const kcal = hasKcal ? window.kcalForLog(app.products, f) : null;
     events.push({
-      type: 'food', date: today, time: f.time,
+      type: 'food', date: f.date || today, time: f.time,
       title: p?.name || 'Foder',
       meta: hasKcal ? `${f.grams} g · ${kcal} kcal` : `${f.grams} g`,
     });

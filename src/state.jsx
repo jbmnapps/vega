@@ -5,6 +5,13 @@ function useAppState() {
   const [day, setDay] = React.useState('midday');
   const [showPhoto, setShowPhoto] = React.useState(true);
 
+  // Cat profile
+  const [catName, setCatName] = React.useState('Vega');
+  const [birthdate, setBirthdate] = React.useState('2025-02-12'); // YYYY-MM-DD
+  const [breed, setBreed] = React.useState('Blandet');
+  const [vet, setVet] = React.useState('Vesterbro Dyreklinik');
+  const [kcalTarget, setKcalTarget] = React.useState(220);
+
   // Weight log — seeded history in kg
   const [weights, setWeights] = React.useState([
     { date: '2026-02-18', kg: 4.35 },
@@ -30,8 +37,6 @@ function useAppState() {
     { id: 'f1', productId: 'p1', grams: 18, time: '08:05' },
     { id: 'f2', productId: 'p2', grams: 45, time: '12:30' },
   ]);
-
-  const kcalTarget = 220;
 
   // Plan — items user built themselves
   // completed reflects day state
@@ -107,12 +112,43 @@ function useAppState() {
 
   return {
     day, setDay, showPhoto, setShowPhoto,
+    catName, setCatName,
+    birthdate, setBirthdate,
+    breed, setBreed,
+    vet, setVet,
+    kcalTarget, setKcalTarget,
     weights, addWeight,
     products, addProduct,
-    foodLog, addFoodLog, kcalTarget,
+    foodLog, addFoodLog,
     plan: planBase, planDone, togglePlan, completePlanFromFood,
     observations, vocab, addObservation,
   };
+}
+
+// Age from YYYY-MM-DD birthdate → "1 år 2 mdr" / "3 mdr" / "2 år"
+function ageFromBirthdate(birthdate) {
+  if (!birthdate) return '';
+  const b = new Date(birthdate);
+  if (isNaN(b.getTime())) return '';
+  const now = new Date();
+  let years = now.getFullYear() - b.getFullYear();
+  let months = now.getMonth() - b.getMonth();
+  if (now.getDate() < b.getDate()) months -= 1;
+  if (months < 0) { years -= 1; months += 12; }
+  if (years < 0) return '';
+  if (years === 0 && months === 0) return 'under 1 mdr';
+  if (years === 0) return `${months} mdr`;
+  if (months === 0) return `${years} år`;
+  return `${years} år ${months} mdr`;
+}
+
+// Format YYYY-MM-DD → "12. marts 2025"
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const months = ['januar','februar','marts','april','maj','juni','juli','august','september','oktober','november','december'];
+  return `${d.getDate()}. ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 // Helpers
@@ -148,3 +184,5 @@ window.productName = productName;
 window.todayKcal = todayKcal;
 window.fmtDelta = fmtDelta;
 window.fmtKg = fmtKg;
+window.ageFromBirthdate = ageFromBirthdate;
+window.fmtDate = fmtDate;

@@ -11,11 +11,11 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile }) {
   const weekdays = ['søndag','mandag','tirsdag','onsdag','torsdag','fredag','lørdag'];
   const dateStr = `${weekdays[today.getDay()].toUpperCase()} · ${today.getDate()}. ${months[today.getMonth()]}`;
 
-  // Status line — Vega's identity snapshot: age + latest weight.
-  // Age hardcoded until birthdate lives in state; weight pulled from latest log.
+  // Status line — identity snapshot: age + latest weight, both derived from state.
   const latestKg = app.weights[app.weights.length - 1]?.kg ?? 4.20;
   const kgStr = latestKg.toFixed(1).replace('.', ',') + ' kg';
-  const statusStr = `1 år 2 mdr · ${kgStr}`;
+  const ageStr = ageFromBirthdate(app.birthdate);
+  const statusStr = ageStr ? `${ageStr} · ${kgStr}` : kgStr;
 
   return (
     <div style={{
@@ -33,7 +33,7 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile }) {
       </div>
 
       {/* === HERO — photo starts cleanly below date === */}
-      <HeroD show={app.showPhoto} statusStr={statusStr} onOpenProfile={onOpenProfile} />
+      <HeroD show={app.showPhoto} catName={app.catName} statusStr={statusStr} onOpenProfile={onOpenProfile} />
 
       {/* === Content below hero — clean cream === */}
       <div style={{
@@ -126,7 +126,7 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile }) {
 
 // Photo starts cleanly — no top gradient. Bottom gradient is long and unhurried,
 // fully opaque cream before Vega+status so warm ink always reads.
-function HeroD({ show, statusStr, onOpenProfile }) {
+function HeroD({ show, catName, statusStr, onOpenProfile }) {
   const HERO_H = 380;
 
   return (
@@ -181,7 +181,7 @@ function HeroD({ show, statusStr, onOpenProfile }) {
         <div style={{
           ...baseText, fontSize: 38, fontWeight: 600,
           color: TOKENS.ink, letterSpacing: '-0.035em', lineHeight: 1,
-        }}>Vega</div>
+        }}>{catName}</div>
         <div style={{
           ...baseText, marginTop: 6, fontSize: 13, fontWeight: 450,
           color: TOKENS.inkSoft, letterSpacing: '-0.005em',

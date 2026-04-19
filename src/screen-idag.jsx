@@ -2,7 +2,7 @@
 // Photo fades into cream at the bottom. Vega + status rest on the gradient.
 // Plan card and quick-log sit on clean cream below — Nordic calm preserved.
 
-function IdagScreen({ app, onOpenLogger, onOpenProfile }) {
+function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost }) {
   const planTotal = app.plan.length;
   const planDoneCount = app.plan.filter(p => app.planDone[p.id]).length;
 
@@ -95,10 +95,23 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile }) {
                         letterSpacing: '-0.005em',
                       }}>kl. {item.time}</div>
                     </div>
-                    {i < app.plan.length - 1 && <Divider inset={52} />}
+                    <Divider inset={52} />
                   </div>
                 );
               })}
+              <div
+                onClick={onAddPost}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  padding: '15px 18px', gap: 14, cursor: 'pointer',
+                }}
+              >
+                <AddGlyph />
+                <div style={{
+                  ...baseText, flex: 1, fontSize: 16, fontWeight: 450,
+                  color: TOKENS.inkMuted, letterSpacing: '-0.01em',
+                }}>Tilføj</div>
+              </div>
             </div>
             <div style={{
               position: 'absolute', left: 0, right: 0, bottom: 0, height: 24,
@@ -187,6 +200,24 @@ function HeroD({ show, catName, statusStr, onOpenProfile }) {
           color: TOKENS.inkSoft, letterSpacing: '-0.005em',
         }}>{statusStr}</div>
       </button>
+    </div>
+  );
+}
+
+// Circle glyph matching PlanCheck's footprint, with a + sign inside.
+// Signals "add" without aggressive filled-green iOS style — stays Nordic calm.
+function AddGlyph() {
+  return (
+    <div style={{
+      width: 24, height: 24, borderRadius: 12,
+      border: `1px dashed ${TOKENS.lineStrong}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    }}>
+      <svg width="10" height="10" viewBox="0 0 10 10">
+        <path d="M5 1v8M1 5h8" fill="none" stroke={TOKENS.inkMuted}
+          strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
     </div>
   );
 }

@@ -38,24 +38,19 @@ function useAppState() {
     { id: 'f2', productId: 'p2', grams: 45, time: '12:30' },
   ]);
 
-  // Plan — items user built themselves
-  // completed reflects day state
-  const planBase = [
+  // Plan — items user built themselves.
+  // Prototype is seeded with one entry (morgenmad); real app opens with empty plan.
+  const [planBase, setPlanBase] = React.useState([
     { id: 'pl1', label: 'Morgenmad', time: '08:00', kind: 'food' },
-    { id: 'pl2', label: 'Frokost', time: '12:30', kind: 'food' },
-    { id: 'pl3', label: 'Legetid', time: '16:00', kind: 'play' },
-    { id: 'pl4', label: 'Aftenmad', time: '19:00', kind: 'food' },
-  ];
-  const [planDone, setPlanDone] = React.useState(() => {
-    return { pl1: true, pl2: true, pl3: false, pl4: false };
-  });
+  ]);
+  const [planDone, setPlanDone] = React.useState({ pl1: false });
 
-  // When day state changes, reset plan
+  // When day state changes, reset the single seeded post's done-state
   React.useEffect(() => {
-    if (day === 'morning') setPlanDone({ pl1: false, pl2: false, pl3: false, pl4: false });
-    if (day === 'midday') setPlanDone({ pl1: true, pl2: true, pl3: false, pl4: false });
-    if (day === 'evening') setPlanDone({ pl1: true, pl2: true, pl3: true, pl4: false });
-    if (day === 'complete') setPlanDone({ pl1: true, pl2: true, pl3: true, pl4: true });
+    if (day === 'morning') setPlanDone({ pl1: false });
+    if (day === 'midday') setPlanDone({ pl1: true });
+    if (day === 'evening') setPlanDone({ pl1: true });
+    if (day === 'complete') setPlanDone({ pl1: true });
   }, [day]);
 
   // Observations

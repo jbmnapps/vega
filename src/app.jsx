@@ -47,7 +47,7 @@ function App() {
   const onCloseModal = () => setModal(null);
 
   const renderScreen = () => {
-    if (tab === 'idag') return <IdagScreen app={app} onOpenLogger={onOpenLogger} onOpenProfile={() => setModal('profile')} />;
+    if (tab === 'idag') return <IdagScreen app={app} onOpenLogger={onOpenLogger} onOpenProfile={() => setModal('profile')} onAddPost={() => {}} />;
     if (tab === 'foder') return <FoderScreen app={app} onOpenLogger={onOpenLogger} />;
     if (tab === 'vaegt') return <VaegtScreen app={app} onOpenLogger={onOpenLogger}
       onOpenDetail={() => setModal('vaegt-detail')}

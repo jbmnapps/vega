@@ -22,7 +22,6 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost, onEditPost })
       position: 'relative', height: '100%',
       display: 'flex', flexDirection: 'column',
       background: TOKENS.bg,
-      overflow: 'hidden',
     }}>
       {/* === HERO — starts straight under status bar (dato fjernet — #96) === */}
       <HeroD
@@ -32,6 +31,7 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost, onEditPost })
         onOpenProfile={onOpenProfile}
         customPhotoUrl={app.heroPhotoDataUrl}
         offsetY={app.heroPhotoOffsetY}
+        iconDark={app.heroIconDark}
         onPickPhoto={(dataUrl) => app.setHeroPhoto(dataUrl)}
         onSaveOffsetY={(v) => app.setHeroPhotoOffsetY(v)}
       />
@@ -116,12 +116,18 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost, onEditPost })
               <div
                 onClick={onAddPost}
                 style={{
-                  display: 'flex', alignItems: 'center',
+                  display: 'flex', alignItems: 'center', gap: 14,
                   padding: '11px 18px', cursor: 'pointer',
                   minHeight: 52,
                 }}
               >
                 <AddGlyph size={24} />
+                {sortedPlan.length === 0 && (
+                  <span style={{
+                    ...baseText, fontSize: 16, fontWeight: 500,
+                    color: TOKENS.inkMuted, letterSpacing: '-0.01em',
+                  }}>Tilføj</span>
+                )}
               </div>
             </div>
             <div style={{
@@ -151,8 +157,16 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost, onEditPost })
 // Photo starts cleanly — no top gradient. Bottom gradient is long and unhurried,
 // fully opaque cream before Vega+status so warm ink always reads.
 // Decision #94: long-press → menu; "Rediger foto" enters pan-adjust mode.
-function HeroD({ show, catName, statusStr, onOpenProfile, customPhotoUrl, offsetY, onPickPhoto, onSaveOffsetY }) {
+function HeroD({ show, catName, statusStr, onOpenProfile, customPhotoUrl, offsetY, iconDark, onPickPhoto, onSaveOffsetY }) {
+  // HERO_H er den *synlige* højde under status-bar-området. STATUS_EXTEND er de
+  // ekstra px vi strækker hero op under statusbaren — matcher app.jsx's
+  // paddingTop: 54. Netto: container = HERO_H + STATUS_EXTEND, flyttet -STATUS_EXTEND
+  // opad så bunden (Vega, plan) bliver på samme pixel-position som før.
   const HERO_H = 420;
+  const STATUS_EXTEND = 54;
+  // Lavere procent viser mere af fotoets top og flytter derfor Vega længere
+  // ned i den eksisterende hero-boks, uden at bunden eller layoutet flytter sig.
+  const DEFAULT_HERO_Y = 0;
   const fileInputRef = React.useRef(null);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [adjustMode, setAdjustMode] = React.useState(false);
@@ -164,6 +178,7 @@ function HeroD({ show, catName, statusStr, onOpenProfile, customPhotoUrl, offset
   const hasCustom = !!customPhotoUrl;
   const photoUrl = customPhotoUrl || 'assets/vega-hero.jpg';
   const shownOffsetY = adjustMode ? draftOffsetY : offsetY;
+  const photoPositionY = hasCustom ? shownOffsetY : DEFAULT_HERO_Y;
 
   // Long-press detection (500ms hold w/o significant move) → open menu.
   const onHeroPointerDown = (e) => {
@@ -239,10 +254,34 @@ function HeroD({ show, catName, statusStr, onOpenProfile, customPhotoUrl, offset
 
   return (
     <div style={{
-      position: 'relative', width: '100%', height: HERO_H,
+      position: 'relative', width: '100%', height: HERO_H + STATUS_EXTEND,
+      marginTop: -STATUS_EXTEND,
       flexShrink: 0, overflow: 'hidden',
       background: TOKENS.amberTint,
     }}>
+      {/* Status-bar blur-bånd — backdrop-filter over hero-toppen, feathered
+          mod bunden så der ingen sømlinje er. Samme recipe som
+          IOSGlassPill/IOSKeyboard, men med blødere blur. IOSStatusBar
+          (zIndex 10 i ios-frame) ligger ovenpå så ikoner forbliver klare. */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0,
+        height: STATUS_EXTEND + 32, zIndex: 4,
+        backdropFilter: 'blur(10px) saturate(140%)',
+        WebkitBackdropFilter: 'blur(10px) saturate(140%)',
+        maskImage: 'linear-gradient(to bottom, black 0%, black 30%, transparent 100%)',
+        WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 30%, transparent 100%)',
+        pointerEvents: 'none',
+      }} />
+      {/* Overlay-statusbar med lyse ikoner når fotoet er mørkt. Overlejrer
+          ios-frame'ns default (zIndex 10) med zIndex 11. Ikke-interaktiv. */}
+      {iconDark && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 11,
+          pointerEvents: 'none',
+        }}>
+          <IOSStatusBar dark={true} />
+        </div>
+      )}
       <input
         ref={fileInputRef}
         type="file"
@@ -263,7 +302,7 @@ function HeroD({ show, catName, statusStr, onOpenProfile, customPhotoUrl, offset
               position: 'absolute', inset: 0,
               backgroundImage: `url(${photoUrl})`,
               backgroundSize: 'cover',
-              backgroundPosition: `50% ${hasCustom ? shownOffsetY : 22}%`,
+              backgroundPosition: `50% ${photoPositionY}%`,
               // Subtle premium lift: a touch more contrast + warmth, no heavy-handed edits.
               filter: 'contrast(1.04) saturate(1.08) brightness(1.02)',
               cursor: adjustMode ? 'grab' : 'default',

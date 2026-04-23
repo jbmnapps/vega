@@ -7,9 +7,9 @@ function useAppState() {
 
   // Cat profile
   const [catName, setCatName] = React.useState('Vega');
-  const [birthdate, setBirthdate] = React.useState('2025-02-12'); // YYYY-MM-DD
-  const [breed, setBreed] = React.useState('Blandet');
-  const [vet, setVet] = React.useState('Vesterbro Dyreklinik');
+  const [birthdate, setBirthdate] = React.useState('2025-04-27'); // YYYY-MM-DD
+  const [breed, setBreed] = React.useState('Huskat');
+  const [vet, setVet] = React.useState('Kongelundens Dyreklinik');
   const [kcalTarget, setKcalTarget] = React.useState(null);
 
   // Hero-foto (Decision #94) — custom foto (data-URL) + vertikal placering 0-100%.
@@ -23,6 +23,12 @@ function useAppState() {
       return v != null ? parseFloat(v) : 50;
     } catch { return 50; }
   });
+  // true = fotoets top er mørkt → statusbar-ikoner skal være lyse. Default
+  // false (vega-hero.jpg er lyst). Samples én gang ved upload.
+  const [heroIconDark, setHeroIconDarkState] = React.useState(() => {
+    try { return localStorage.getItem('mycat-hero-icon-dark') === '1'; }
+    catch { return false; }
+  });
 
   const setHeroPhoto = (dataUrl) => {
     setHeroPhotoDataUrlState(dataUrl);
@@ -32,6 +38,17 @@ function useAppState() {
       else localStorage.removeItem('mycat-hero-photo');
       localStorage.setItem('mycat-hero-offset-y', '50');
     } catch {}
+    // Sample fotoets top-stripe for at afgøre ikon-farve. Async — ikoner
+    // flipper når målingen lander (typisk <50ms).
+    if (dataUrl) {
+      sampleHeroTopIsDark(dataUrl).then(isDark => {
+        setHeroIconDarkState(isDark);
+        try { localStorage.setItem('mycat-hero-icon-dark', isDark ? '1' : '0'); } catch {}
+      });
+    } else {
+      setHeroIconDarkState(false);
+      try { localStorage.setItem('mycat-hero-icon-dark', '0'); } catch {}
+    }
   };
 
   const setHeroPhotoOffsetY = (n) => {
@@ -85,20 +102,9 @@ function useAppState() {
     { id: 'f2', productId: 'p2', grams: 45, time: '12:30', date: _today, kcal100Snapshot: 78 },
   ]);
 
-  // Plan — items user built themselves.
-  // Prototype is seeded with one entry (morgenmad); real app opens with empty plan.
-  const [planBase, setPlanBase] = React.useState([
-    { id: 'pl1', label: 'Morgenmad', time: '08:00', kind: 'food', category: 'mad' },
-  ]);
-  const [planDone, setPlanDone] = React.useState({ pl1: false });
-
-  // When day state changes, reset the single seeded post's done-state
-  React.useEffect(() => {
-    if (day === 'morning') setPlanDone({ pl1: false });
-    if (day === 'midday') setPlanDone({ pl1: true });
-    if (day === 'evening') setPlanDone({ pl1: true });
-    if (day === 'complete') setPlanDone({ pl1: true });
-  }, [day]);
+  // Plan — items user built themselves. Starts empty; plan is optional (Decision #50).
+  const [planBase, setPlanBase] = React.useState([]);
+  const [planDone, setPlanDone] = React.useState({});
 
   // Observations
   const [observations, setObservations] = React.useState([
@@ -216,7 +222,7 @@ function useAppState() {
     breed, setBreed,
     vet, setVet,
     kcalTarget, setKcalTarget,
-    heroPhotoDataUrl, heroPhotoOffsetY,
+    heroPhotoDataUrl, heroPhotoOffsetY, heroIconDark,
     setHeroPhoto, setHeroPhotoOffsetY, removeHeroPhoto,
     weights, addWeight,
     products, addProduct, removeProduct,
@@ -224,6 +230,38 @@ function useAppState() {
     plan: planBase, planDone, togglePlan, addPlanPost, updatePlanPost, removePlanPost,
     observations, vocab, addObservation, removeObservation,
   };
+}
+
+// Sampler luminans af fotoets top-stripe (øverste 15%) for at afgøre om
+// statusbar-ikoner skal være lyse eller mørke. Returnerer Promise<boolean>:
+// true = mørkt foto, brug lyse ikoner. Kørt én gang pr. upload.
+function sampleHeroTopIsDark(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = 120;
+        const h = Math.max(1, Math.round(img.height * (w / img.width) * 0.15));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, img.height * (w / img.width));
+        const data = ctx.getImageData(0, 0, w, h).data;
+        let sum = 0, n = 0;
+        for (let i = 0; i < data.length; i += 16) {
+          // WCAG relative luminance, coarse
+          sum += 0.2126 * data[i] + 0.7152 * data[i+1] + 0.0722 * data[i+2];
+          n++;
+        }
+        const avg = sum / n;
+        // Tærskel 140: lidt over midten, favoriserer dark-icons-default
+        // så ikoner kun flipper til lys på tydeligt mørke fotos.
+        resolve(avg < 140);
+      } catch { resolve(false); }
+    };
+    img.onerror = () => resolve(false);
+    img.src = dataUrl;
+  });
 }
 
 // Age from YYYY-MM-DD birthdate → "1 år 2 mdr" / "3 mdr" / "2 år"

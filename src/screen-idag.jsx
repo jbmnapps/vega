@@ -2,7 +2,7 @@
 // Photo fades into cream at the bottom. Vega + status rest on the gradient.
 // Plan card and quick-log sit on clean cream below — Nordic calm preserved.
 
-function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost }) {
+function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost, onEditPost }) {
   const sortedPlan = React.useMemo(
     () => [...app.plan].sort((a, b) => a.time.localeCompare(b.time)),
     [app.plan]
@@ -10,11 +10,6 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost }) {
   const planTotal = sortedPlan.length;
   const planDoneCount = sortedPlan.filter(p => app.planDone[p.id]).length;
   const [swipeOpenId, setSwipeOpenId] = React.useState(null);
-
-  const today = new Date();
-  const months = ['januar','februar','marts','april','maj','juni','juli','august','september','oktober','november','december'];
-  const weekdays = ['søndag','mandag','tirsdag','onsdag','torsdag','fredag','lørdag'];
-  const dateStr = `${weekdays[today.getDay()].toUpperCase()} · ${today.getDate()}. ${months[today.getMonth()]}`;
 
   // Status line — identity snapshot: age + latest weight, both derived from state.
   const latestKg = app.weights[app.weights.length - 1]?.kg ?? 4.20;
@@ -29,16 +24,17 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost }) {
       background: TOKENS.bg,
       overflow: 'hidden',
     }}>
-      {/* === Date — sits on clean cream, above the photo === */}
-      <div style={{ padding: '18px 24px 12px', flexShrink: 0 }}>
-        <div style={{
-          ...baseText, fontSize: 10.5, fontWeight: 500,
-          color: TOKENS.ink, letterSpacing: '0.16em', opacity: 0.7,
-        }}>{dateStr}</div>
-      </div>
-
-      {/* === HERO — photo starts cleanly below date === */}
-      <HeroD show={app.showPhoto} catName={app.catName} statusStr={statusStr} onOpenProfile={onOpenProfile} />
+      {/* === HERO — starts straight under status bar (dato fjernet — #96) === */}
+      <HeroD
+        show={app.showPhoto}
+        catName={app.catName}
+        statusStr={statusStr}
+        onOpenProfile={onOpenProfile}
+        customPhotoUrl={app.heroPhotoDataUrl}
+        offsetY={app.heroPhotoOffsetY}
+        onPickPhoto={(dataUrl) => app.setHeroPhoto(dataUrl)}
+        onSaveOffsetY={(v) => app.setHeroPhotoOffsetY(v)}
+      />
 
       {/* === Content below hero — clean cream === */}
       <div style={{
@@ -81,19 +77,19 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost }) {
                       <div
                         onClick={() => {
                           if (swipeOpenId === item.id) { setSwipeOpenId(null); return; }
-                          if (item.kind === 'food' && !done) onOpenLogger('foder-log');
-                          else app.togglePlan(item.id);
+                          onEditPost(item.id);
                         }}
                         style={{
                           display: 'flex', alignItems: 'center',
                           padding: '11px 18px', gap: 14, cursor: 'pointer',
                           background: TOKENS.surface,
+                          minHeight: 52,
                         }}
                       >
                         <PlanCheck checked={done} onClick={(e) => { e.stopPropagation(); app.togglePlan(item.id); }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{
-                            ...baseText, fontSize: 16, fontWeight: 450,
+                            ...baseText, fontSize: 16, fontWeight: 500,
                             color: done ? TOKENS.inkMuted : TOKENS.ink,
                             letterSpacing: '-0.01em',
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -121,14 +117,11 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost }) {
                 onClick={onAddPost}
                 style={{
                   display: 'flex', alignItems: 'center',
-                  padding: '11px 18px', gap: 14, cursor: 'pointer',
+                  padding: '11px 18px', cursor: 'pointer',
+                  minHeight: 52,
                 }}
               >
-                <AddGlyph />
-                <div style={{
-                  ...baseText, flex: 1, fontSize: 16, fontWeight: 450,
-                  color: TOKENS.inkMuted, letterSpacing: '-0.01em',
-                }}>Tilføj</div>
+                <AddGlyph size={24} />
               </div>
             </div>
             <div style={{
@@ -157,8 +150,92 @@ function IdagScreen({ app, onOpenLogger, onOpenProfile, onAddPost }) {
 
 // Photo starts cleanly — no top gradient. Bottom gradient is long and unhurried,
 // fully opaque cream before Vega+status so warm ink always reads.
-function HeroD({ show, catName, statusStr, onOpenProfile }) {
-  const HERO_H = 380;
+// Decision #94: long-press → menu; "Rediger foto" enters pan-adjust mode.
+function HeroD({ show, catName, statusStr, onOpenProfile, customPhotoUrl, offsetY, onPickPhoto, onSaveOffsetY }) {
+  const HERO_H = 420;
+  const fileInputRef = React.useRef(null);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [adjustMode, setAdjustMode] = React.useState(false);
+  const [draftOffsetY, setDraftOffsetY] = React.useState(offsetY);
+  const longPressTimer = React.useRef(null);
+  const pressStart = React.useRef(null);
+  const dragStart = React.useRef(null);
+
+  const hasCustom = !!customPhotoUrl;
+  const photoUrl = customPhotoUrl || 'assets/vega-hero.jpg';
+  const shownOffsetY = adjustMode ? draftOffsetY : offsetY;
+
+  // Long-press detection (500ms hold w/o significant move) → open menu.
+  const onHeroPointerDown = (e) => {
+    if (adjustMode) return;
+    pressStart.current = { x: e.clientX, y: e.clientY };
+    longPressTimer.current = setTimeout(() => {
+      setMenuOpen(true);
+      longPressTimer.current = null;
+    }, 500);
+  };
+  const onHeroPointerMove = (e) => {
+    if (!pressStart.current || !longPressTimer.current) return;
+    const dx = e.clientX - pressStart.current.x;
+    const dy = e.clientY - pressStart.current.y;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  const onHeroPointerUp = () => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+    pressStart.current = null;
+  };
+
+  const triggerFilePick = () => {
+    setMenuOpen(false);
+    fileInputRef.current?.click();
+  };
+  const onFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      onPickPhoto(reader.result);
+      setDraftOffsetY(50);
+      setAdjustMode(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const enterAdjust = () => {
+    setMenuOpen(false);
+    setDraftOffsetY(offsetY);
+    setAdjustMode(true);
+  };
+  const cancelAdjust = () => {
+    setAdjustMode(false);
+    setDraftOffsetY(offsetY);
+  };
+  const saveAdjust = () => {
+    onSaveOffsetY(draftOffsetY);
+    setAdjustMode(false);
+  };
+
+  // Pan-drag in adjust mode: dy in px → offsetY delta (100% over hero height).
+  const onAdjustDragDown = (e) => {
+    if (!adjustMode) return;
+    dragStart.current = { y: e.clientY, startOffset: draftOffsetY };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onAdjustDragMove = (e) => {
+    if (!dragStart.current) return;
+    const dy = e.clientY - dragStart.current.y;
+    const deltaPct = (dy / HERO_H) * 100;
+    const next = Math.max(0, Math.min(100, dragStart.current.startOffset - deltaPct));
+    setDraftOffsetY(next);
+  };
+  const onAdjustDragUp = (e) => {
+    dragStart.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+  };
 
   return (
     <div style={{
@@ -166,16 +243,48 @@ function HeroD({ show, catName, statusStr, onOpenProfile }) {
       flexShrink: 0, overflow: 'hidden',
       background: TOKENS.amberTint,
     }}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={onFileChange}
+        style={{ display: 'none' }}
+      />
+
       {show && (
         <React.Fragment>
-          <div style={{
-            position: 'absolute', inset: 0,
-            backgroundImage: 'url(assets/vega-hero.jpg)',
-            backgroundSize: 'cover',
-            backgroundPosition: '50% 22%',
-            // Subtle premium lift: a touch more contrast + warmth, no heavy-handed edits.
-            filter: 'contrast(1.04) saturate(1.08) brightness(1.02)',
-          }} />
+          <div
+            onPointerDown={onHeroPointerDown}
+            onPointerMove={onHeroPointerMove}
+            onPointerUp={onHeroPointerUp}
+            onPointerCancel={onHeroPointerUp}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{
+              position: 'absolute', inset: 0,
+              backgroundImage: `url(${photoUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: `50% ${hasCustom ? shownOffsetY : 22}%`,
+              // Subtle premium lift: a touch more contrast + warmth, no heavy-handed edits.
+              filter: 'contrast(1.04) saturate(1.08) brightness(1.02)',
+              cursor: adjustMode ? 'grab' : 'default',
+              touchAction: adjustMode ? 'none' : 'auto',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+            }} />
+          {/* Adjust-mode drag surface — sits above the photo layer, captures pointer events. */}
+          {adjustMode && (
+            <div
+              onPointerDown={onAdjustDragDown}
+              onPointerMove={onAdjustDragMove}
+              onPointerUp={onAdjustDragUp}
+              onPointerCancel={onAdjustDragUp}
+              style={{
+                position: 'absolute', inset: 0, zIndex: 5,
+                cursor: dragStart.current ? 'grabbing' : 'grab',
+                touchAction: 'none',
+              }}
+            />
+          )}
           {/* Fine film grain — SVG turbulence, very low opacity, soft-light blend.
               Adds perceived sharpness and texture without being visible as noise. */}
           <svg style={{
@@ -191,48 +300,150 @@ function HeroD({ show, catName, statusStr, onOpenProfile }) {
         </React.Fragment>
       )}
 
-      {/* Bottom fade — starts at 50% height, unhurried, fully cream by bottom */}
+      {/* Bottom fade — kortere (160 i stedet for 220) så mere af fotoet er synligt,
+          men stadig blød kurve. Bundzonen (Vega+status) forbliver fuldt opaque. */}
       <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, height: 220,
+        position: 'absolute', left: 0, right: 0, bottom: 0, height: 160,
         background: `linear-gradient(180deg,
           rgba(244,239,231,0) 0%,
-          rgba(244,239,231,0.3) 30%,
-          rgba(244,239,231,0.7) 60%,
-          rgba(244,239,231,0.95) 82%,
+          rgba(244,239,231,0.2) 35%,
+          rgba(244,239,231,0.75) 65%,
+          rgba(244,239,231,0.98) 85%,
           ${TOKENS.bg} 100%)`,
         pointerEvents: 'none',
       }} />
 
-      {/* Vega + status — bottom-left, on fully opaque cream gradient */}
-      <button onClick={onOpenProfile} style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0,
-        background: 'transparent', border: 'none',
-        padding: '16px 20px 20px', cursor: 'pointer', textAlign: 'left',
-      }}>
+      {/* Vega + status — skjules under adjust og menu for at holde hero-fladen ren */}
+      {!adjustMode && !menuOpen && (
+        <button onClick={onOpenProfile} style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          background: 'transparent', border: 'none',
+          padding: '16px 20px 20px', cursor: 'pointer', textAlign: 'left',
+        }}>
+          <div style={{
+            ...baseText, fontSize: 38, fontWeight: 600,
+            color: TOKENS.ink, letterSpacing: '-0.035em', lineHeight: 1,
+          }}>{catName}</div>
+          <div style={{
+            ...baseText, marginTop: 6, fontSize: 13, fontWeight: 450,
+            color: TOKENS.inkSoft, letterSpacing: '-0.005em',
+          }}>{statusStr}</div>
+        </button>
+      )}
+
+      {/* Long-press menu — subtile knapper i nederste del af hero (over bottom fade).
+          Empty-state: kun "Tilføj foto". Custom foto present: "Skift foto" + "Rediger foto". */}
+      {menuOpen && (
+        <HeroMenuOverlay
+          hasCustom={hasCustom}
+          onClose={() => setMenuOpen(false)}
+          onPick={triggerFilePick}
+          onEdit={enterAdjust}
+        />
+      )}
+
+      {/* Adjust-mode top bar */}
+      {adjustMode && (
         <div style={{
-          ...baseText, fontSize: 38, fontWeight: 600,
-          color: TOKENS.ink, letterSpacing: '-0.035em', lineHeight: 1,
-        }}>{catName}</div>
-        <div style={{
-          ...baseText, marginTop: 6, fontSize: 13, fontWeight: 450,
-          color: TOKENS.inkSoft, letterSpacing: '-0.005em',
-        }}>{statusStr}</div>
-      </button>
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '12px 16px',
+          background: `linear-gradient(180deg, rgba(30,24,18,0.55) 0%, rgba(30,24,18,0) 100%)`,
+          pointerEvents: 'none',
+        }}>
+          <button onClick={cancelAdjust} style={{
+            ...baseText, background: 'rgba(255,255,255,0.18)',
+            border: 'none', borderRadius: 10,
+            color: '#fff', fontSize: 13, fontWeight: 500,
+            padding: '7px 14px', cursor: 'pointer',
+            letterSpacing: '-0.005em',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            pointerEvents: 'auto',
+          }}>Annullér</button>
+          <div style={{
+            ...baseText, fontSize: 12, fontWeight: 450,
+            color: 'rgba(255,255,255,0.85)', letterSpacing: '0.02em',
+          }}>Træk op og ned</div>
+          <button onClick={saveAdjust} style={{
+            ...baseText, background: '#fff',
+            border: 'none', borderRadius: 10,
+            color: TOKENS.ink, fontSize: 13, fontWeight: 500,
+            padding: '7px 14px', cursor: 'pointer',
+            letterSpacing: '-0.005em',
+            pointerEvents: 'auto',
+          }}>Gem</button>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Subtile foto-menu-knapper nederst i hero (over bottom fade).
+// Matcher grammatikken: cream surface, dark ink, 0.5px line — ingen iOS-chrome.
+function HeroMenuOverlay({ hasCustom, onClose, onPick, onEdit }) {
+  return (
+    <React.Fragment>
+      {/* Scrim/tap-outside-to-close — let dæmpning af hero så knapperne står frem */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'absolute', inset: 0, zIndex: 8,
+          background: 'rgba(30, 24, 18, 0.18)',
+        }}
+      />
+      <div style={{
+        position: 'absolute', left: 20, right: 20, bottom: 20, zIndex: 9,
+        display: 'flex', flexDirection: 'column', gap: 8,
+        pointerEvents: 'none',
+      }}>
+        {!hasCustom && (
+          <HeroMenuButton label="Tilføj foto" onClick={onPick} />
+        )}
+        {hasCustom && (
+          <React.Fragment>
+            <HeroMenuButton label="Rediger foto" onClick={onEdit} />
+            <HeroMenuButton label="Skift foto" onClick={onPick} />
+          </React.Fragment>
+        )}
+      </div>
+    </React.Fragment>
+  );
+}
+
+function HeroMenuButton({ label, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        ...baseText,
+        pointerEvents: 'auto',
+        background: TOKENS.surface,
+        border: `0.5px solid ${TOKENS.line}`,
+        borderRadius: 14,
+        padding: '13px 16px',
+        fontSize: 15, fontWeight: 450,
+        color: TOKENS.ink, letterSpacing: '-0.005em',
+        cursor: 'pointer',
+        textAlign: 'center',
+        boxShadow: '0 4px 14px rgba(30,24,18,0.10)',
+      }}
+    >{label}</button>
   );
 }
 
 // Circle glyph matching PlanCheck's footprint, with a + sign inside.
 // Signals "add" without aggressive filled-green iOS style — stays Nordic calm.
-function AddGlyph() {
+function AddGlyph({ size = 24 }) {
+  const inner = Math.round(size * 10 / 24);
   return (
     <div style={{
-      width: 24, height: 24, borderRadius: 12,
+      width: size, height: size, borderRadius: size / 2,
       border: `1px dashed ${TOKENS.lineStrong}`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexShrink: 0,
     }}>
-      <svg width="10" height="10" viewBox="0 0 10 10">
+      <svg width={inner} height={inner} viewBox="0 0 10 10">
         <path d="M5 1v8M1 5h8" fill="none" stroke={TOKENS.inkMuted}
           strokeWidth="1.4" strokeLinecap="round" />
       </svg>
@@ -339,3 +550,4 @@ function SwipeRow({ children, onDelete, open, onOpenChange }) {
 }
 
 window.IdagScreen = IdagScreen;
+window.SwipeRow = SwipeRow;

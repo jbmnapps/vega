@@ -2,21 +2,25 @@
 // Påkrævet: tekst + tid. Valgfrit: kategori + kategori-detaljer.
 // Hvis tid er i fortiden: "klaret?"-toggle (default ja).
 
-function AddPostScreen({ app, onBack, onComplete }) {
-  const [text, setText] = React.useState('');
-  const [digits, setDigits] = React.useState('');
-  const [done, setDone] = React.useState(true);
-  const [category, setCategory] = React.useState(null);
-  const [productId, setProductId] = React.useState(null);
-  const [grams, setGrams] = React.useState('');
-  const [minutes, setMinutes] = React.useState('');
-  const [medDose, setMedDose] = React.useState('');
-  const [medUnit, setMedUnit] = React.useState('mg');
+function AddPostScreen({ app, onBack, onComplete, editPostId }) {
+  const existing = editPostId ? app.plan.find(p => p.id === editPostId) : null;
+  const isEdit = !!existing;
+
+  const [text, setText] = React.useState(existing?.label || '');
+  const [digits, setDigits] = React.useState(existing ? existing.time.replace(':', '') : '');
+  const [done, setDone] = React.useState(isEdit ? !!app.planDone[editPostId] : true);
+  const [category, setCategory] = React.useState(existing?.category || null);
+  const [productId, setProductId] = React.useState(existing?.details?.productId || null);
+  const [grams, setGrams] = React.useState(existing?.details?.grams != null ? String(existing.details.grams) : '');
+  const [minutes, setMinutes] = React.useState(existing?.details?.minutes != null ? String(existing.details.minutes) : '');
+  const [medDose, setMedDose] = React.useState(existing?.details?.dose != null ? String(existing.details.dose) : '');
+  const [medUnit, setMedUnit] = React.useState(existing?.details?.unit || 'mg');
   const [showNewProduct, setShowNewProduct] = React.useState(false);
 
   const validTime = digits.length === 4;
   const valid = text.trim().length > 0 && validTime;
   const past = validTime && isTimeInPast(digits);
+  const showDoneToggle = isEdit || past;
 
   const submit = () => {
     if (!valid) return;
@@ -32,19 +36,21 @@ function AddPostScreen({ app, onBack, onComplete }) {
       details.dose = parseFloat(medDose.replace(',', '.'));
       details.unit = medUnit;
     }
-    app.addPlanPost({
+    const payload = {
       label: text.trim(),
       time: digitsToTime(digits),
       category,
       details: Object.keys(details).length ? details : null,
-      done: past ? done : false,
-    });
+      done: showDoneToggle ? done : false,
+    };
+    if (isEdit) app.updatePlanPost(editPostId, payload);
+    else app.addPlanPost(payload);
     onComplete();
   };
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <ScreenHeader title="Ny plan" onBack={onBack} />
+      <ScreenHeader title={isEdit ? 'Redigér plan' : 'Ny plan'} onBack={onBack} />
       <div style={{ flex: 1, padding: '0 20px 140px', overflow: 'auto' }}>
         <div style={{ padding: '0 6px 10px' }}><SectionLabel>Hvad</SectionLabel></div>
         <TextInput value={text} onChange={setText} placeholder="F.eks. Aftenmad" autoFocus />
@@ -52,7 +58,7 @@ function AddPostScreen({ app, onBack, onComplete }) {
         <div style={{ padding: '22px 6px 10px' }}><SectionLabel>Tidspunkt</SectionLabel></div>
         <MaskedTimeInput digits={digits} onChange={setDigits} />
 
-        {past && (
+        {showDoneToggle && (
           <div style={{ marginTop: 14 }}>
             <ToggleRow label="Klaret?" value={done} onChange={setDone} />
           </div>
@@ -66,7 +72,7 @@ function AddPostScreen({ app, onBack, onComplete }) {
         {category === 'mad' && (
           <div style={{ marginTop: 14 }}>
             <ProductPicker
-              products={app.products}
+              products={app.products.filter(p => !p.archived)}
               value={productId}
               onChange={setProductId}
               onCreateNew={() => setShowNewProduct(true)}
@@ -96,7 +102,7 @@ function AddPostScreen({ app, onBack, onComplete }) {
         padding: '16px 20px 34px',
         background: `linear-gradient(180deg, rgba(244,239,231,0) 0%, ${TOKENS.bg} 40%)`,
       }}>
-        <PrimaryButton onClick={submit} disabled={!valid}>Tilføj</PrimaryButton>
+        <PrimaryButton onClick={submit} disabled={!valid}>{isEdit ? 'Gem ændringer' : 'Tilføj'}</PrimaryButton>
       </div>
 
       {showNewProduct && (
@@ -296,3 +302,5 @@ function digitsToTime(d) {
 }
 
 window.AddPostScreen = AddPostScreen;
+window.MaskedTimeInput = MaskedTimeInput;
+window.digitsToTime = digitsToTime;

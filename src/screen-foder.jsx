@@ -1,7 +1,7 @@
 // Foder — food tracking. Product library + logs. Kcal is optional.
 
 function FoderScreen({ app, onOpenLogger }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = window.localISO();
   const [date, setDate] = React.useState(today);
   const isToday = date === today;
   const logged = window.kcalForDate(app.products, app.foodLog, date);
@@ -48,7 +48,7 @@ function FoderScreen({ app, onOpenLogger }) {
           padding: '0 6px 12px',
         }}>
           <SectionLabel>{dayLabel}</SectionLabel>
-          {isToday && <PlusAction label="Log foder" onClick={() => onOpenLogger('foder-log')} />}
+          <PlusAction label="Log foder" onClick={() => onOpenLogger('foder-log', { foderLogDate: date })} />
         </div>
         {dayLogs.length === 0 ? (
           <Card padding={24}>
@@ -60,6 +60,7 @@ function FoderScreen({ app, onOpenLogger }) {
               const product = app.products.find(p => p.id === log.productId);
               const kcal = window.kcalForLog(app.products, log);
               const hasKcal = product?.kcal100 != null;
+              const originalKcal = window.originalKcalForLog(app.products, log);
               return (
                 <div key={log.id}>
                   <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -72,6 +73,12 @@ function FoderScreen({ app, onOpenLogger }) {
                         ...baseText, fontSize: 12, color: TOKENS.inkMuted,
                         marginTop: 3, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.005em',
                       }}>kl. {log.time} · {log.grams} g</div>
+                      {originalKcal != null && (
+                        <div style={{
+                          ...baseText, fontSize: 11, color: TOKENS.inkFaint,
+                          marginTop: 3, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.005em',
+                        }}>oprindeligt {originalKcal} kcal</div>
+                      )}
                     </div>
                     {hasKcal && (
                       <div style={{
@@ -89,33 +96,22 @@ function FoderScreen({ app, onOpenLogger }) {
       </div>
 
       <div style={{ padding: '0 20px 24px' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 6px 12px',
-        }}>
-          <SectionLabel>Produkter</SectionLabel>
-          <PlusAction label="Ny" onClick={() => onOpenLogger('foder-new-product')} />
-        </div>
         <Card padding={0}>
-          {app.products.map((p, i) => (
-            <div key={p.id}>
-              <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    ...baseText, fontSize: 15, fontWeight: 450, color: TOKENS.ink,
-                    letterSpacing: '-0.012em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>{p.name}</div>
-                  <div style={{ ...baseText, fontSize: 12, color: TOKENS.inkMuted, marginTop: 3, letterSpacing: '-0.005em' }}>{p.type}</div>
-                </div>
-                {p.kcal100 != null ? (
-                  <div style={{ ...baseText, fontSize: 13, color: TOKENS.inkMuted, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.005em' }}>{p.kcal100} kcal/100g</div>
-                ) : (
-                  <div style={{ ...baseText, fontSize: 12, color: TOKENS.inkFaint, letterSpacing: '-0.005em' }}>uden kcal</div>
-                )}
-              </div>
-              {i < app.products.length - 1 && <Divider inset={18} />}
-            </div>
-          ))}
+          <div
+            onClick={() => onOpenLogger('produkter')}
+            style={{
+              padding: '16px 18px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}
+          >
+            <div style={{
+              ...baseText, flex: 1, fontSize: 15, fontWeight: 450, color: TOKENS.ink,
+              letterSpacing: '-0.012em',
+            }}>Produkter <span style={{ color: TOKENS.inkMuted, fontWeight: 400 }}>({app.products.filter(p => !p.archived).length})</span></div>
+            <svg width="8" height="14" viewBox="0 0 8 14">
+              <path d="M1 1l6 6-6 6" stroke={TOKENS.inkFaint} strokeWidth="1.4" fill="none" strokeLinecap="round"/>
+            </svg>
+          </div>
         </Card>
       </div>
     </div>

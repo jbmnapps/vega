@@ -150,7 +150,7 @@ function PlanCheck({ checked, onClick }) {
     <button onClick={onClick} style={{
       width: 24, height: 24, borderRadius: 12,
       border: checked ? 'none' : `1.3px solid ${TOKENS.lineStrong}`,
-      background: checked ? TOKENS.inkSoft : 'transparent',
+      background: checked ? '#14100e' : 'transparent',
       cursor: 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 0, flexShrink: 0,
@@ -168,12 +168,12 @@ function PlanCheck({ checked, onClick }) {
 
 // Day swiper — < date > control used on screens that scroll through days
 function DaySwiper({ date, onChange }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = window.localISO();
   const isToday = date === today;
   const isFuture = new Date(date) > new Date(today);
   const shift = (days) => {
     const d = new Date(date); d.setDate(d.getDate() + days);
-    onChange(d.toISOString().slice(0, 10));
+    onChange(window.localISO(d));
   };
   const wds = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
   const weekday = wds[new Date(date).getDay()];
